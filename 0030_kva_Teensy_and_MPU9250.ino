@@ -1,13 +1,9 @@
-/* MPU9250_MS5637_t3 Basic Example Code
+/* MPU9250_MS5637_AHRS_t3
  by: Kris Winer
  date: April 1, 2014
  license: Beerware - Use this code however you'd like. If you 
  find it useful you can buy me a beer some time.
  
- mofified by Dominique Martel
- date: March 2024
- source: /home/dominique/Arduino/robotics/IMUs/MPU9250_MS5637_AHRS_t3.ino
-
  Demonstrate basic MPU-9250 functionality including parameterizing the register addresses, initializing the sensor, 
  getting properly scaled accelerometer, gyroscope, and magnetometer data out. Added display functions to 
  allow display to on breadboard monitor. Addition of 9 DoF sensor fusion using open source Madgwick and 
@@ -35,25 +31,35 @@
  We have disabled the internal pull-ups used by the Wire library in the Wire.h/twi.c utility file.
  We are also using the 400 kHz fast I2C mode by setting the TWI_FREQ  to 400000L /twi.h utility file.
  */
-//#include "Wire.h"   
-#include <i2c_t3.h>
+#include "Wire.h"   
+// this to request an end of transmission with restart condition
+#define I2C_NOSTOP false
+
+//#include <i2c_t3.h>
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
 
 // Using NOKIA 5110 monochrome 84 x 48 pixel display
-// pin 7 - Serial clock out (SCLK)
-// pin 6 - Serial data out (DIN)
+// Hardware SPI (faster, but must use certain hardware pins):
+// SCK is LCD serial clock (SCLK) - this is pin 13 on Arduino Uno and Teensy 3.2 as well
+// MOSI is LCD DIN - this is pin 11 on an Arduino Uno and Teensy 3.2 as well
 // pin 5 - Data/Command select (D/C)
-// pin 3 - LCD chip select (SCE)
-// pin 4 - LCD reset (RST)
-Adafruit_PCD8544 display = Adafruit_PCD8544(7, 6, 5, 3, 4);
+// pin 4 - LCD chip select (CS)
+// pin 3 - LCD reset (RST)
+Adafruit_PCD8544 display = Adafruit_PCD8544(5, 4, 3);
+// Note with hardware SPI MISO and SS pins aren't used but will still be read
+// and written to during SPI transfer.  Be careful sharing these pins!
 
+//#define COMPILE_MS5637 // compile for pressure sensor or not
+
+#ifdef COMPILE_MS5637
 // See MS5637-02BA03 Low Voltage Barometric Pressure Sensor Data Sheet
 #define MS5637_RESET      0x1E
 #define MS5637_CONVERT_D1 0x40
 #define MS5637_CONVERT_D2 0x50
 #define MS5637_ADC_READ   0x00
+#endif
 
 // See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in 
 // above document; the MPU9250 and MPU9150 are virtually identical but the latter has a different register map
@@ -276,7 +282,9 @@ float magCalibration[3] = {0, 0, 0};  // Factory mag calibration and mag bias
 float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}, magBias[3] = {0, 0, 0}, magScale[3]  = {0, 0, 0};      // Bias corrections for gyro and accelerometer
 int16_t tempCount;            // temperature raw count output
 float   temperature;          // Stores the MPU9250 gyro internal chip temperature in degrees Celsius
+#ifdef COMPILE_MS5637
 double Temperature, Pressure; // stores MS5637 pressures sensor pressure and temperature
+#endif
 float SelfTest[6];            // holds results of gyro and accelerometer self test
 
 // global constants for 9 DoF fusion and AHRS (Attitude and Heading Reference System)
@@ -310,11 +318,13 @@ float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for M
 
 void setup()
 {
-//  Wire.begin();
+  Wire.begin();
+  Wire.setClock(400000);
+
 //  TWBR = 12;  // 400 kbit/sec I2C speed for Pro Mini
   // Setup for Master mode, pins 18/19, external pullups, 400kHz for Teensy 3.1
-  Wire.begin(I2C_MASTER, 0x00, I2C_PINS_16_17, I2C_PULLUP_EXT, I2C_RATE_400);
-  delay(4000);
+//  Wire.begin(I2C_MASTER, 0x00, I2C_PINS_16_17, I2C_PULLUP_EXT, I2C_RATE_400);
+  delay(1000);
   Serial.begin(38400);
   
   // Set up the interrupt pin, its set as active high, push-pull
@@ -323,7 +333,7 @@ void setup()
   digitalWrite(myLed, HIGH);
   
   display.begin(); // Initialize the display
-  display.setContrast(40); // Set the contrast
+  display.setContrast(25); // Set the contrast
   
 // Start device display with ID of sensor
   display.clearDisplay();
@@ -394,7 +404,7 @@ void setup()
   display.setCursor(66, 24); display.print("o/s");   
  
   display.display();
-  delay(1000);  
+  delay(10000);  
    
   initMPU9250(); 
   Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
@@ -433,11 +443,13 @@ void setup()
   display.setCursor(0,30); display.print("ASAZ "); display.setCursor(50,30); display.print(magCalibration[2], 2);
   display.display();
   delay(1000);  
-  
+
+#ifdef COMPILE_MS5637
   // Reset the MS5637 pressure sensor
   MS5637Reset();
   delay(100);
   Serial.println("MS5637 pressure sensor reset...");
+  
   // Read PROM data from MS5637 pressure sensor
   MS5637PromRead(Pcal);
   Serial.println("PROM dta read:");
@@ -459,7 +471,7 @@ void setup()
   display.setCursor(0,20); display.print("Should be "); display.setCursor(50,30); display.print(refCRC);
   display.display();
   delay(1000);  
-
+#endif
   attachInterrupt(intPin, myinthandler, RISING);  // define interrupt for INT pin output of MPU9250
 
   }
@@ -532,13 +544,16 @@ void loop()
     if(SerialDebug) {
     Serial.print("ax = "); Serial.print((int)1000*ax);  
     Serial.print(" ay = "); Serial.print((int)1000*ay); 
-    Serial.print(" az = "); Serial.print((int)1000*az); Serial.println(" mg");
+    Serial.print(" az = "); Serial.print((int)1000*az);
+    Serial.println(" mg");
     Serial.print("gx = "); Serial.print( gx, 2); 
     Serial.print(" gy = "); Serial.print( gy, 2); 
-    Serial.print(" gz = "); Serial.print( gz, 2); Serial.println(" deg/s");
+    Serial.print(" gz = "); Serial.print( gz, 2);
+    Serial.println(" deg/s");
     Serial.print("mx = "); Serial.print( (int)mx ); 
     Serial.print(" my = "); Serial.print( (int)my ); 
-    Serial.print(" mz = "); Serial.print( (int)mz ); Serial.println(" mG");
+    Serial.print(" mz = "); Serial.print( (int)mz );
+    Serial.println(" mG");
     
     Serial.print("q0 = "); Serial.print(q[0]);
     Serial.print(" qx = "); Serial.print(q[1]); 
@@ -548,8 +563,12 @@ void loop()
     tempCount = readTempData();  // Read the gyro adc values
     temperature = ((float) tempCount) / 333.87 + 21.0; // Gyro chip temperature in degrees Centigrade
    // Print temperature in degrees Centigrade      
-    Serial.print("Gyro temperature is ");  Serial.print(temperature, 1);  Serial.println(" degrees C"); // Print T values to tenths of s degree C
- 
+    Serial.print("Gyro temperature is ");
+    Serial.print(temperature, 1);
+    Serial.println(" degrees C"); // Print T values to tenths of s degree C
+
+ #ifdef COMPILE_MS5637
+
     D1 = MS5637Read(ADC_D1, OSR);  // get raw pressure value
     D2 = MS5637Read(ADC_D2, OSR);  // get raw temperature value
     dT = D2 - Pcal[5]*pow(2,8);    // calculate temperature difference from reference
@@ -602,12 +621,23 @@ void loop()
     float altitude = 145366.45*(1. - pow((Pressure/1013.25), 0.190284));
    
     if(SerialDebug) {
-    Serial.print("Digital temperature value = "); Serial.print( (float)Temperature, 2); Serial.println(" C"); // temperature in degrees Celsius
-    Serial.print("Digital temperature value = "); Serial.print(9.*(float) Temperature/5. + 32., 2); Serial.println(" F"); // temperature in degrees Fahrenheit
-    Serial.print("Digital pressure value = "); Serial.print((float) Pressure, 2);  Serial.println(" mbar");// pressure in millibar
-    Serial.print("Altitude = "); Serial.print(altitude, 2); Serial.println(" feet");
+    Serial.print("Digital temperature value = ");
+    Serial.print( (float)Temperature, 2);
+    Serial.println(" C"); // temperature in degrees Celsius
+    /*
+    Serial.print("Digital temperature value = ");
+    Serial.print(9.*(float) Temperature/5. + 32., 2);
+    Serial.println(" F"); // temperature in degrees Fahrenheit
+    */
+    Serial.print("Digital pressure value = ");
+    Serial.print((float) Pressure, 2);
+    Serial.println(" mbar");// pressure in millibar
+    Serial.print("Altitude = ");
+    Serial.print(altitude, 2); Serial.println(" feet");
     }
-    
+ #endif // #ifdef COMPILE_MS5637
+
+
    // Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
   // In this coordinate system, the positive z-axis is down toward Earth. 
   // Yaw is the angle between Sensor x-axis and Earth magnetic North (or true North if corrected for local declination, looking down on the sensor positive yaw is counterclockwise.
@@ -701,9 +731,12 @@ void loop()
     // stabilization control of a fast-moving robot or quadcopter. Compare to the update rate of 200 Hz
     // produced by the on-board Digital Motion Processor of Invensense's MPU6050 6 DoF and MPU9150 9DoF sensors.
     // The 3.3 V 8 MHz Pro Mini is doing pretty well!
+#ifdef COMPILE_MS5637
     display.setCursor(0, 40); display.print(altitude, 0); display.print("ft"); 
     display.setCursor(68, 0); display.print(9.*Temperature/5. + 32., 0); 
     display.setCursor(42, 40); display.print((float) sumCount / (1000.*sum), 2); display.print("kHz"); 
+#endif //#ifdef COMPILE_MS5637
+
     display.display();
 
     digitalWrite(myLed, !digitalRead(myLed));
@@ -1203,6 +1236,8 @@ void MPU9250SelfTest(float * destination) // Should return percent deviation fro
    
 }
 
+#ifdef COMPILE_MS5637
+
 // I2C communication with the MS5637 is a little different from that with the MPU9250 and most other sensors
 // For the MS5637, we write commands, and the MS5637 sends data in response, rather than directly reading
 // MS5637 registers
@@ -1279,6 +1314,7 @@ unsigned char MS5637checkCRC(uint16_t * n_prom)  // calculate checksum from PROM
   n_rem = ((n_rem>>12) & 0x000F);
   return (n_rem ^ 0x00);
 }
+#endif // #ifdef COMPILE_MS5637
 
 
 // I2C scan function
