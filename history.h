@@ -30,7 +30,10 @@ todo
 10. Compile directive to eliminate pressure (MS5637) DONE
 >>>>>>>>>>>>>>>>>>>>>>>> branch main TEST ADD
 >>>>>>>>>>>>>>>>>>>>>>>> branch main commit -m "MPU 9250 9dof and Nokia 5110 display operational"
+git remote "kvaimu" renamed "origin"
+>>>>>>>>>>>>>>>>>>>>>>>> branch main pushed
 
+11. add serial print control compile directives TEST ADD COMMIT -m "Issue 11: add serial print compile directives" PUSH DONE
 
 */
 

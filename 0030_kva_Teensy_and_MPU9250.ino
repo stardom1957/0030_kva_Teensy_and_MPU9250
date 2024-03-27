@@ -31,6 +31,26 @@
  We have disabled the internal pull-ups used by the Wire library in the Wire.h/twi.c utility file.
  We are also using the 400 kHz fast I2C mode by setting the TWI_FREQ  to 400000L /twi.h utility file.
  */
+
+/* definition of debug levels
+    mainly replacing Serial.print and Serial.println by nothing when not needed
+    that is:
+     DEBUG_LEVEL_0 used to debug HMI
+     DEBUG_LEVEL_1 used to debug handle_emergency
+*/ 
+#define DEBUG_LEVEL_0 0 // 1 means debug level 0 is active 0 means it's not
+#if DEBUG_LEVEL_0 == 1
+  #define debug(x) Serial.print(x)
+  #define debug_2arg(x, y) Serial.print(x, y)
+  #define debugln(x) Serial.println(x)
+  #define debugln_2arg(x, y) Serial.println(x, y)
+#else
+  #define debug(x)
+  #define debug_2arg(x, y)
+  #define debugln(x)
+  #define debugln_2arg(x, y)
+#endif
+
 #include "Wire.h"   
 // this to request an end of transmission with restart condition
 #define I2C_NOSTOP false
@@ -51,8 +71,9 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(5, 4, 3);
 // Note with hardware SPI MISO and SS pins aren't used but will still be read
 // and written to during SPI transfer.  Be careful sharing these pins!
 
+// **************************************************************
 //#define COMPILE_MS5637 // compile for pressure sensor or not
-
+// **************************************************************
 #ifdef COMPILE_MS5637
 // See MS5637-02BA03 Low Voltage Barometric Pressure Sensor Data Sheet
 #define MS5637_RESET      0x1E
@@ -325,7 +346,9 @@ void setup()
   // Setup for Master mode, pins 18/19, external pullups, 400kHz for Teensy 3.1
 //  Wire.begin(I2C_MASTER, 0x00, I2C_PINS_16_17, I2C_PULLUP_EXT, I2C_RATE_400);
   delay(1000);
+  #if DEBUG_LEVEL_0 == 1
   Serial.begin(38400);
+  #endif
   
   // Set up the interrupt pin, its set as active high, push-pull
   pinMode(intPin, INPUT);
@@ -344,7 +367,7 @@ void setup()
   display.setCursor(0, 30); display.print("motion sensor");
   display.setCursor(20,40); display.print("60 ug LSB");
   display.display();
-  delay(1000);
+  delay(8000);
 
 // Set up for data display
   display.setTextSize(1); // Set text size to normal, 2 is twice normal etc.
@@ -354,28 +377,49 @@ void setup()
   I2Cscan();// look for I2C devices on the bus
     
   // Read the WHO_AM_I register, this is a good test of communication
-  Serial.println("MPU9250 9-axis motion sensor...");
+  debugln("MPU9250 9-axis motion sensor...");
   byte c = readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
-  Serial.print("MPU9250 "); Serial.print("I AM "); Serial.print(c, HEX); Serial.print(" I should be "); Serial.println(0x71, HEX);
-  display.setCursor(20,0); display.print("MPU9250");
-  display.setCursor(0,10); display.print("I AM");
-  display.setCursor(0,20); display.print(c, HEX);  
-  display.setCursor(0,30); display.print("I Should Be");
-  display.setCursor(0,40); display.print(0x71, HEX); 
+  debug("MPU9250 ");
+  debug("I AM ");
+  debug_2arg(c, HEX);
+  debug(" I should be ");
+  debugln_2arg(0x71, HEX);
+  display.setCursor(20,0);
+  display.print("MPU9250");
+  display.setCursor(0,10);
+  display.print("I AM");
+  display.setCursor(0,20);
+  display.print(c, HEX);  
+  display.setCursor(0,30);
+  display.print("I Should Be");
+  display.setCursor(0,40);
+  display.print(0x71, HEX); 
   display.display();
   delay(1000); 
 
   if (c == 0x71) // WHO_AM_I should always be 0x68
   {  
-    Serial.println("MPU9250 is online...");
+    debugln("MPU9250 is online...");
     
     MPU9250SelfTest(SelfTest); // Start by performing self test and reporting values
-    Serial.print("x-axis self test: acceleration trim within : "); Serial.print(SelfTest[0],1); Serial.println("% of factory value");
-    Serial.print("y-axis self test: acceleration trim within : "); Serial.print(SelfTest[1],1); Serial.println("% of factory value");
-    Serial.print("z-axis self test: acceleration trim within : "); Serial.print(SelfTest[2],1); Serial.println("% of factory value");
-    Serial.print("x-axis self test: gyration trim within : "); Serial.print(SelfTest[3],1); Serial.println("% of factory value");
-    Serial.print("y-axis self test: gyration trim within : "); Serial.print(SelfTest[4],1); Serial.println("% of factory value");
-    Serial.print("z-axis self test: gyration trim within : "); Serial.print(SelfTest[5],1); Serial.println("% of factory value");
+    debug("x-axis self test: acceleration trim within : ");
+    debug_2arg(SelfTest[0],1);
+    debugln("% of factory value");
+    debug("y-axis self test: acceleration trim within : ");
+    debug_2arg(SelfTest[1],1);
+    debugln("% of factory value");
+    debug("z-axis self test: acceleration trim within : ");
+    debug_2arg(SelfTest[2],1);
+    debugln("% of factory value");
+    debug("x-axis self test: gyration trim within : ");
+    debug_2arg(SelfTest[3],1);
+    debugln("% of factory value");
+    debug("y-axis self test: gyration trim within : ");
+    debug_2arg(SelfTest[4],1);
+    debugln("% of factory value");
+    debug("z-axis self test: gyration trim within : ");
+    debug_2arg(SelfTest[5],1);
+    debugln("% of factory value");
     delay(1000);
     
    // get sensor resolutions, only need to do this once
@@ -383,10 +427,16 @@ void setup()
    getGres();
    getMres();
     
-   Serial.println(" Calibrate gyro and accel");
+   debugln(" Calibrate gyro and accel");
    accelgyrocalMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
-   Serial.println("accel biases (mg)"); Serial.println(1000.*accelBias[0]); Serial.println(1000.*accelBias[1]); Serial.println(1000.*accelBias[2]);
-   Serial.println("gyro biases (dps)"); Serial.println(gyroBias[0]); Serial.println(gyroBias[1]); Serial.println(gyroBias[2]);
+   debugln("accel biases (mg)");
+   debugln(1000. * accelBias[0]);
+   debugln(1000. * accelBias[1]);
+   debugln(1000. * accelBias[2]);
+   debugln("gyro biases (dps)");
+   debugln(gyroBias[0]);
+   debugln(gyroBias[1]);
+   debugln(gyroBias[2]);
 
   display.clearDisplay();
      
@@ -407,40 +457,69 @@ void setup()
   delay(10000);  
    
   initMPU9250(); 
-  Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
+  debugln("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
   
   // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
   byte d = readByte(AK8963_ADDRESS, AK8963_WHO_AM_I);  // Read WHO_AM_I register for AK8963
-  Serial.print("AK8963 "); Serial.print("I AM "); Serial.print(d, HEX); Serial.print(" I should be "); Serial.println(0x48, HEX);
+  debug("AK8963 ");
+  debug("I AM ");
+  debug_2arg(d, HEX);
+  debug(" I should be ");
+  debugln_2arg(0x48, HEX);
   display.clearDisplay();
-  display.setCursor(20,0); display.print("AK8963");
-  display.setCursor(0,10); display.print("I AM");
-  display.setCursor(0,20); display.print(d, HEX);  
-  display.setCursor(0,30); display.print("I Should Be");
-  display.setCursor(0,40); display.print(0x48, HEX);  
+  display.setCursor(20,0);
+  display.print("AK8963");
+  display.setCursor(0,10);
+  display.print("I AM");
+  display.setCursor(0,20);
+  display.print(d, HEX);  
+  display.setCursor(0,30);
+  display.print("I Should Be");
+  display.setCursor(0,40);
+  display.print(0x48, HEX);  
   display.display();
   delay(1000); 
   
   // Get magnetometer calibration from AK8963 ROM
-  initAK8963(magCalibration); Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
+  initAK8963(magCalibration);
+  debugln("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
   
   magcalMPU9250(magBias, magScale);
-  Serial.println("AK8963 mag biases (mG)"); Serial.println(magBias[0]); Serial.println(magBias[1]); Serial.println(magBias[2]); 
-  Serial.println("AK8963 mag scale (mG)"); Serial.println(magScale[0]); Serial.println(magScale[1]); Serial.println(magScale[2]); 
+  debugln("AK8963 mag biases (mG)");
+  debugln(magBias[0]);
+  debugln(magBias[1]);
+  debugln(magBias[2]); 
+  debugln("AK8963 mag scale (mG)");
+  debugln(magScale[0]);
+  debugln(magScale[1]);
+  debugln(magScale[2]); 
   delay(2000); // add delay to see results before serial spew of data
    
   if(SerialDebug) {
-//  Serial.println("Calibration values: ");
-  Serial.print("X-Axis sensitivity adjustment value "); Serial.println(magCalibration[0], 2);
-  Serial.print("Y-Axis sensitivity adjustment value "); Serial.println(magCalibration[1], 2);
-  Serial.print("Z-Axis sensitivity adjustment value "); Serial.println(magCalibration[2], 2);
+//  debugln("Calibration values: ");
+  debug("X-Axis sensitivity adjustment value ");
+  debugln_2arg(magCalibration[0], 2);
+  debug("Y-Axis sensitivity adjustment value ");
+  debugln_2arg(magCalibration[1], 2);
+  debug("Z-Axis sensitivity adjustment value ");
+  debugln_2arg(magCalibration[2], 2);
   }
   
   display.clearDisplay();
-  display.setCursor(20,0); display.print("AK8963");
-  display.setCursor(0,10); display.print("ASAX "); display.setCursor(50,10); display.print(magCalibration[0], 2);
-  display.setCursor(0,20); display.print("ASAY "); display.setCursor(50,20); display.print(magCalibration[1], 2);
-  display.setCursor(0,30); display.print("ASAZ "); display.setCursor(50,30); display.print(magCalibration[2], 2);
+  display.setCursor(20,0);
+  display.print("AK8963");
+  display.setCursor(0,10);
+  display.print("ASAX ");
+  display.setCursor(50,10);
+  display.print(magCalibration[0], 2);
+  display.setCursor(0,20);
+  display.print("ASAY ");
+  display.setCursor(50,20);
+  display.print(magCalibration[1], 2);
+  display.setCursor(0,30);
+  display.print("ASAZ ");
+  display.setCursor(50,30);
+  display.print(magCalibration[2], 2);
   display.display();
   delay(1000);  
 
@@ -448,27 +527,44 @@ void setup()
   // Reset the MS5637 pressure sensor
   MS5637Reset();
   delay(100);
-  Serial.println("MS5637 pressure sensor reset...");
+  debugln("MS5637 pressure sensor reset...");
   
   // Read PROM data from MS5637 pressure sensor
   MS5637PromRead(Pcal);
-  Serial.println("PROM dta read:");
-  Serial.print("C0 = "); Serial.println(Pcal[0]);
+  debugln("PROM dta read:");
+  debug("C0 = ");
+  debugln(Pcal[0]);
   unsigned char refCRC = Pcal[0] >> 12;
-  Serial.print("C1 = "); Serial.println(Pcal[1]);
-  Serial.print("C2 = "); Serial.println(Pcal[2]);
-  Serial.print("C3 = "); Serial.println(Pcal[3]);
-  Serial.print("C4 = "); Serial.println(Pcal[4]);
-  Serial.print("C5 = "); Serial.println(Pcal[5]);
-  Serial.print("C6 = "); Serial.println(Pcal[6]);
+  debug("C1 = ");
+  debugln(Pcal[1]);
+  debug("C2 = ");
+  debugln(Pcal[2]);
+  debug("C3 = ");
+  debugln(Pcal[3]);
+  debug("C4 = ");
+  debugln(Pcal[4]);
+  debug("C5 = ");
+  debugln(Pcal[5]);
+  debug("C6 = ");
+  debugln(Pcal[6]);
   
   nCRC = MS5637checkCRC(Pcal);  //calculate checksum to ensure integrity of MS5637 calibration data
-  Serial.print("Checksum = "); Serial.print(nCRC); Serial.print(" , should be "); Serial.println(refCRC);  
+  debug("Checksum = ");
+  debug(nCRC);
+  debug(" , should be ");
+  debugln(refCRC);  
   
   display.clearDisplay();
-  display.setCursor(20,0); display.print("MS5637");
-  display.setCursor(0,10); display.print("CRC is "); display.setCursor(50,10); display.print(nCRC);
-  display.setCursor(0,20); display.print("Should be "); display.setCursor(50,30); display.print(refCRC);
+  display.setCursor(20,0);
+  display.print("MS5637");
+  display.setCursor(0,10);
+  display.print("CRC is ");
+  display.setCursor(50,10);
+  display.print(nCRC);
+  display.setCursor(0,20);
+  display.print("Should be ");
+  display.setCursor(50,30);
+  display.print(refCRC);
   display.display();
   delay(1000);  
 #endif
@@ -477,8 +573,8 @@ void setup()
   }
   else
   {
-    Serial.print("Could not connect to MPU9250: 0x");
-    Serial.println(c, HEX);
+    debug("Could not connect to MPU9250: 0x");
+    debugln_2arg(c, HEX);
     while(1) ; // Loop forever if communication doesn't happen
   }
 }
@@ -492,16 +588,16 @@ void loop()
  //   readAccelData(accelCount);  // Read the x/y/z adc values
     
     // Now we'll calculate the accleration value into actual g's
-    ax = (float)MPU9250Data[0]*aRes - accelBias[0];  // get actual g value, this depends on scale being set
-    ay = (float)MPU9250Data[1]*aRes - accelBias[1];   
-    az = (float)MPU9250Data[2]*aRes - accelBias[2];  
+    ax = (float)MPU9250Data[0] * aRes - accelBias[0];  // get actual g value, this depends on scale being set
+    ay = (float)MPU9250Data[1] * aRes - accelBias[1];   
+    az = (float)MPU9250Data[2] * aRes - accelBias[2];  
    
  //   readGyroData(gyroCount);  // Read the x/y/z adc values
 
     // Calculate the gyro value into actual degrees per second
-    gx = (float)MPU9250Data[4]*gRes;  // get actual gyro value, this depends on scale being set
-    gy = (float)MPU9250Data[5]*gRes;  
-    gz = (float)MPU9250Data[6]*gRes;   
+    gx = (float)MPU9250Data[4] * gRes;  // get actual gyro value, this depends on scale being set
+    gy = (float)MPU9250Data[5] * gRes;  
+    gz = (float)MPU9250Data[6] * gRes;   
   
     readMagData(magCount);  // Read the x/y/z adc values
    
@@ -509,9 +605,9 @@ void loop()
     // Include factory calibration per data sheet and user environmental corrections
     if(newMagData == true) {
       newMagData = false; // reset newMagData flag
-      mx = (float)magCount[0]*mRes*magCalibration[0] - magBias[0];  // get actual magnetometer value, this depends on scale being set
-      my = (float)magCount[1]*mRes*magCalibration[1] - magBias[1];  
-      mz = (float)magCount[2]*mRes*magCalibration[2] - magBias[2];  
+      mx = (float)magCount[0] * mRes * magCalibration[0] - magBias[0];  // get actual magnetometer value, this depends on scale being set
+      my = (float)magCount[1] * mRes * magCalibration[1] - magBias[1];  
+      mz = (float)magCount[2] * mRes * magCalibration[2] - magBias[2];  
       mx *= magScale[0];
       my *= magScale[1];
       mz *= magScale[2]; 
@@ -542,30 +638,43 @@ void loop()
     if (delt_t > 500) { // update LCD once per half-second independent of read rate
 
     if(SerialDebug) {
-    Serial.print("ax = "); Serial.print((int)1000*ax);  
-    Serial.print(" ay = "); Serial.print((int)1000*ay); 
-    Serial.print(" az = "); Serial.print((int)1000*az);
-    Serial.println(" mg");
-    Serial.print("gx = "); Serial.print( gx, 2); 
-    Serial.print(" gy = "); Serial.print( gy, 2); 
-    Serial.print(" gz = "); Serial.print( gz, 2);
-    Serial.println(" deg/s");
-    Serial.print("mx = "); Serial.print( (int)mx ); 
-    Serial.print(" my = "); Serial.print( (int)my ); 
-    Serial.print(" mz = "); Serial.print( (int)mz );
-    Serial.println(" mG");
+    debug("ax = ");
+    debug((int)1000 * ax);  
+    debug(" ay = ");
+    debug((int)1000 * ay); 
+    debug(" az = ");
+    debug((int)1000 * az);
+    debugln(" mg");
+    debug("gx = ");
+    debug_2arg( gx, 2); 
+    debug(" gy = ");
+    debug_2arg( gy, 2); 
+    debug(" gz = ");
+    debug_2arg( gz, 2);
+    debugln(" deg/s");
+    debug("mx = ");
+    debug( (int)mx ); 
+    debug(" my = ");
+    debug( (int)my ); 
+    debug(" mz = ");
+    debug( (int)mz );
+    debugln(" mG");
     
-    Serial.print("q0 = "); Serial.print(q[0]);
-    Serial.print(" qx = "); Serial.print(q[1]); 
-    Serial.print(" qy = "); Serial.print(q[2]); 
-    Serial.print(" qz = "); Serial.println(q[3]); 
+    debug("q0 = ");
+    debug(q[0]);
+    debug(" qx = ");
+    debug(q[1]); 
+    debug(" qy = ");
+    debug(q[2]); 
+    debug(" qz = ");
+    debugln(q[3]); 
     }               
     tempCount = readTempData();  // Read the gyro adc values
     temperature = ((float) tempCount) / 333.87 + 21.0; // Gyro chip temperature in degrees Centigrade
    // Print temperature in degrees Centigrade      
-    Serial.print("Gyro temperature is ");
-    Serial.print(temperature, 1);
-    Serial.println(" degrees C"); // Print T values to tenths of s degree C
+    debug("Gyro temperature is ");
+    debug_2arg(temperature, 1);
+    debugln(" degrees C"); // Print T values to tenths of s degree C
 
  #ifdef COMPILE_MS5637
 
@@ -621,19 +730,19 @@ void loop()
     float altitude = 145366.45*(1. - pow((Pressure/1013.25), 0.190284));
    
     if(SerialDebug) {
-    Serial.print("Digital temperature value = ");
-    Serial.print( (float)Temperature, 2);
-    Serial.println(" C"); // temperature in degrees Celsius
+    debug("Digital temperature value = ");
+    debug( (float)Temperature, 2);
+    debugln(" C"); // temperature in degrees Celsius
     /*
-    Serial.print("Digital temperature value = ");
-    Serial.print(9.*(float) Temperature/5. + 32., 2);
-    Serial.println(" F"); // temperature in degrees Fahrenheit
+    debug("Digital temperature value = ");
+    debug(9.*(float) Temperature/5. + 32., 2);
+    debugln(" F"); // temperature in degrees Fahrenheit
     */
-    Serial.print("Digital pressure value = ");
-    Serial.print((float) Pressure, 2);
-    Serial.println(" mbar");// pressure in millibar
-    Serial.print("Altitude = ");
-    Serial.print(altitude, 2); Serial.println(" feet");
+    debug("Digital pressure value = ");
+    debug((float) Pressure, 2);
+    debugln(" mbar");// pressure in millibar
+    debug("Altitude = ");
+    debug(altitude, 2); debugln(" feet");
     }
  #endif // #ifdef COMPILE_MS5637
 
@@ -673,27 +782,31 @@ void loop()
     lin_ay = ay + a32;
     lin_az = az - a33;
     if(SerialDebug) {
-    Serial.print("Yaw, Pitch, Roll: ");
-    Serial.print(yaw, 2);
-    Serial.print(", ");
-    Serial.print(pitch, 2);
-    Serial.print(", ");
-    Serial.println(roll, 2);
+    debug("Yaw, Pitch, Roll: ");
+    debug_2arg(yaw, 2);
+    debug(", ");
+    debug_2arg(pitch, 2);
+    debug(", ");
+    debugln_2arg(roll, 2);
 
-    Serial.print("Grav_x, Grav_y, Grav_z: ");
-    Serial.print(-a31*1000, 2);
-    Serial.print(", ");
-    Serial.print(-a32*1000, 2);
-    Serial.print(", ");
-    Serial.print(a33*1000, 2);  Serial.println(" mg");
-    Serial.print("Lin_ax, Lin_ay, Lin_az: ");
-    Serial.print(lin_ax*1000, 2);
-    Serial.print(", ");
-    Serial.print(lin_ay*1000, 2);
-    Serial.print(", ");
-    Serial.print(lin_az*1000, 2);  Serial.println(" mg");
+    debug("Grav_x, Grav_y, Grav_z: ");
+    debug_2arg(-a31 * 1000, 2);
+    debug(", ");
+    debug_2arg(-a32 * 1000, 2);
+    debug(", ");
+    debug_2arg(a33 * 1000, 2);
+    debugln(" mg");
+    debug("Lin_ax, Lin_ay, Lin_az: ");
+    debug_2arg(lin_ax * 1000, 2);
+    debug(", ");
+    debug_2arg(lin_ay * 1000, 2);
+    debug(", ");
+    debug_2arg(lin_az * 1000, 2);
+    debugln(" mg");
     
-    Serial.print("rate = "); Serial.print((float)sumCount/sum, 2); Serial.println(" Hz");
+    debug("rate = ");
+    debug_2arg((float)sumCount / sum, 2);
+    debugln(" Hz");
     }
    
     display.clearDisplay();    
@@ -1104,7 +1217,7 @@ void magcalMPU9250(float * dest1, float * dest2)
   int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
   int16_t mag_max[3] = {-32767, -32767, -32767}, mag_min[3] = {32767, 32767, 32767}, mag_temp[3] = {0, 0, 0};
 
-  Serial.println("Mag Calibration: Wave device in a figure eight until done!");
+  debugln("Mag Calibration: Wave device in a figure eight until done!");
   delay(4000);
   
     // shoot for ~fifteen seconds of mag data
@@ -1120,9 +1233,9 @@ void magcalMPU9250(float * dest1, float * dest2)
     if(Mmode == 0x06) delay(12);  // at 100 Hz ODR, new mag data is available every 10 ms
     }
 
-//    Serial.println("mag x min/max:"); Serial.println(mag_max[0]); Serial.println(mag_min[0]);
-//    Serial.println("mag y min/max:"); Serial.println(mag_max[1]); Serial.println(mag_min[1]);
-//    Serial.println("mag z min/max:"); Serial.println(mag_max[2]); Serial.println(mag_min[2]);
+//    debugln("mag x min/max:"); debugln(mag_max[0]); debugln(mag_min[0]);
+//    debugln("mag y min/max:"); debugln(mag_max[1]); debugln(mag_min[1]);
+//    debugln("mag z min/max:"); debugln(mag_max[2]); debugln(mag_min[2]);
 
     // Get hard iron correction
     mag_bias[0]  = (mag_max[0] + mag_min[0])/2;  // get average x mag bias in counts
@@ -1145,7 +1258,7 @@ void magcalMPU9250(float * dest1, float * dest2)
     dest2[1] = avg_rad/((float)mag_scale[1]);
     dest2[2] = avg_rad/((float)mag_scale[2]);
   
-   Serial.println("Mag Calibration done!");
+   debugln("Mag Calibration done!");
 }
 
 
@@ -1325,7 +1438,7 @@ void I2Cscan()
   byte error, address;
   int nDevices;
 
-  Serial.println("Scanning...");
+  debugln("Scanning...");
 
   nDevices = 0;
   for(address = 1; address < 127; address++ ) 
@@ -1338,26 +1451,26 @@ void I2Cscan()
 
     if (error == 0)
     {
-      Serial.print("I2C device found at address 0x");
+      debug("I2C device found at address 0x");
       if (address<16) 
-        Serial.print("0");
-      Serial.print(address,HEX);
-      Serial.println("  !");
+        debug("0");
+      debug_2arg(address, HEX);
+      debugln("  !");
 
       nDevices++;
     }
     else if (error==4) 
     {
-      Serial.print("Unknow error at address 0x");
+      debug("Unknow error at address 0x");
       if (address<16) 
-        Serial.print("0");
-      Serial.println(address,HEX);
+        debug("0");
+      debugln_2arg(address, HEX);
     }    
   }
   if (nDevices == 0)
-    Serial.println("No I2C devices found\n");
+    debugln("No I2C devices found\n");
   else
-    Serial.println("done\n");
+    debugln("done\n");
     
 }
 
