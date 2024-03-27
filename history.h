@@ -35,6 +35,16 @@ git remote "kvaimu" renamed "origin"
 
 11. add serial print control compile directives TEST ADD COMMIT -m "Issue 11: add serial print compile directives" PUSH DONE
 
+>>>>>>>>>>>>>>>>>>>>>>>> begin branch button_control
+12. insert code for button on interrupt:
+  12.1 one clic to continue
+  12.2 two clic ...
+  12.3 three clic to calibrate magnetometer AK8963
+
+>>>>>>>>>>>>>>>>>>>>>>>> end branch button_control
+
+13. Implement serial plot of YPR (see Kris Winer article)
+
 */
 
 #endif
