@@ -60,6 +60,11 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
 
+bool volatile display_paused{false};     // display is paused
+void isr_fonction() {
+  display_paused = false;
+}
+
 // Using NOKIA 5110 monochrome 84 x 48 pixel display
 // Hardware SPI (faster, but must use certain hardware pins):
 // SCK is LCD serial clock (SCLK) - this is pin 13 on Arduino Uno and Teensy 3.2 as well
@@ -244,7 +249,7 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(5, 4, 3);
 #define MS5637_ADDRESS 0x76   // Address of altimeter
 #endif  
 
-#define SerialDebug true  // set to true to get Serial output for debugging
+//#define SerialDebug true  // set to true to get Serial output for debugging
 
 // Set initial input parameters
 enum Ascale {
@@ -336,38 +341,88 @@ float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration w
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
+/*******************************************************************
+ SETUP SETUP SETUP SETUP SETUP SETUP SETUP SETUP SETUP SETUP SETUP
+*/
 
+#define CLIC_PIN 2 // pin for clics, interrupt switch
 void setup()
 {
   Wire.begin();
   Wire.setClock(400000);
 
+
 //  TWBR = 12;  // 400 kbit/sec I2C speed for Pro Mini
   // Setup for Master mode, pins 18/19, external pullups, 400kHz for Teensy 3.1
 //  Wire.begin(I2C_MASTER, 0x00, I2C_PINS_16_17, I2C_PULLUP_EXT, I2C_RATE_400);
-  delay(1000);
+  delay(100);
   #if DEBUG_LEVEL_0 == 1
   Serial.begin(38400);
   #endif
   
-  // Set up the interrupt pin, its set as active high, push-pull
+  // Set up the interrupt pins, its set as active high, push-pull
   pinMode(intPin, INPUT);
+  pinMode(CLIC_PIN, INPUT);
   pinMode(myLed, OUTPUT);
   digitalWrite(myLed, HIGH);
+
+  attachInterrupt(CLIC_PIN, isr_fonction, RISING);
+  //attachInterrupt(digitalPinToInterrupt(CLIC_PIN), isr_fonction, RISING);
   
   display.begin(); // Initialize the display
   display.setContrast(25); // Set the contrast
   
 // Start device display with ID of sensor
   display.clearDisplay();
-  display.setTextSize(2);
-  display.setCursor(0,0); display.print("MPU9250");
   display.setTextSize(1);
-  display.setCursor(0, 20); display.print("9-DOF 16-bit");
-  display.setCursor(0, 30); display.print("motion sensor");
-  display.setCursor(20,40); display.print("60 ug LSB");
+  display.setCursor(0,0);
+  display.print("MPU9250");
+
+  //display.setTextSize(1);
+  display.setCursor(0, 10);
+  display.print("9-DOF 16-bit");
+
+  display.setCursor(0, 20);
+  display.print("motion sensor");
+
+  display.setCursor(0,30);
+  display.print("60 ug LSB");
+
+  display.setCursor(0,40);
+  display.print("paused");
+
   display.display();
-  delay(8000);
+  display_paused = true;
+  while(display_paused);
+  //delay(8000);
+
+/* Display tests */
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(0,0);
+  display.print("max 14 caracte");
+  display.setCursor(0,8);
+  display.print("ligne 2");
+
+  display.setCursor(0,16);
+  display.print("ligne 3");
+  display.print("<--");
+
+  display.setCursor(0,24);
+  display.print("ligne 4");
+
+  display.setCursor(0,32);
+  display.print("ligne 5");
+
+  display.setCursor(0,40);
+  display.print("ligne 6 paused");
+
+  display.display();
+
+  display_paused = true;
+  while(display_paused);
+
+  display.display();
 
 // Set up for data display
   display.setTextSize(1); // Set text size to normal, 2 is twice normal etc.
@@ -384,18 +439,26 @@ void setup()
   debug_2arg(c, HEX);
   debug(" I should be ");
   debugln_2arg(0x71, HEX);
+
   display.setCursor(20,0);
   display.print("MPU9250");
+
   display.setCursor(0,10);
-  display.print("I AM");
-  display.setCursor(0,20);
-  display.print(c, HEX);  
+  display.print("Unit ID:");
+
+  //display.setCursor(0,20);
+  display.setCursor(50,10);
+  display.print(c, HEX);
+
   display.setCursor(0,30);
-  display.print("I Should Be");
-  display.setCursor(0,40);
-  display.print(0x71, HEX); 
+  //display.print("I Should Be");
+  display.print("paused");
+  //display.setCursor(0,40);
+  //display.print(0x71, HEX); 
   display.display();
-  delay(1000); 
+  display_paused = true;
+  while(display_paused);
+  //delay(1000); 
 
   if (c == 0x71) // WHO_AM_I should always be 0x68
   {  
@@ -415,6 +478,7 @@ void setup()
     debug_2arg(SelfTest[3],1);
     debugln("% of factory value");
     debug("y-axis self test: gyration trim within : ");
+
     debug_2arg(SelfTest[4],1);
     debugln("% of factory value");
     debug("z-axis self test: gyration trim within : ");
@@ -495,7 +559,6 @@ void setup()
   debugln(magScale[2]); 
   delay(2000); // add delay to see results before serial spew of data
    
-  if(SerialDebug) {
 //  debugln("Calibration values: ");
   debug("X-Axis sensitivity adjustment value ");
   debugln_2arg(magCalibration[0], 2);
@@ -503,7 +566,6 @@ void setup()
   debugln_2arg(magCalibration[1], 2);
   debug("Z-Axis sensitivity adjustment value ");
   debugln_2arg(magCalibration[2], 2);
-  }
   
   display.clearDisplay();
   display.setCursor(20,0);
@@ -569,13 +631,12 @@ void setup()
   delay(1000);  
 #endif
   attachInterrupt(intPin, myinthandler, RISING);  // define interrupt for INT pin output of MPU9250
-
   }
   else
   {
     debug("Could not connect to MPU9250: 0x");
     debugln_2arg(c, HEX);
-    while(1) ; // Loop forever if communication doesn't happen
+    while(1); // Loop forever if communication doesn't happen
   }
 }
 
@@ -630,14 +691,12 @@ void loop()
   // function to get North along the accel +x-axis, East along the accel -y-axis, and Down along the accel -z-axis.
   // This orientation choice can be modified to allow any convenient (non-NED) orientation convention.
   // Pass gyro rate as rad/s
-    MadgwickQuaternionUpdate(-ax, ay, az, gx*PI/180.0f, -gy*PI/180.0f, -gz*PI/180.0f,  my,  -mx, mz);
+    MadgwickQuaternionUpdate(-ax, ay, az, gx * PI/180.0f, -gy * PI/180.0f, -gz * PI/180.0f,  my,  -mx, mz);
 //  if(passThru)MahonyQuaternionUpdate(-ax, ay, az, gx*PI/180.0f, -gy*PI/180.0f, -gz*PI/180.0f,  my,  -mx, mz);
 
     // Serial print and/or display at 0.5 s rate independent of data rates
     delt_t = millis() - count;
     if (delt_t > 500) { // update LCD once per half-second independent of read rate
-
-    if(SerialDebug) {
     debug("ax = ");
     debug((int)1000 * ax);  
     debug(" ay = ");
@@ -668,7 +727,7 @@ void loop()
     debug(q[2]); 
     debug(" qz = ");
     debugln(q[3]); 
-    }               
+
     tempCount = readTempData();  // Read the gyro adc values
     temperature = ((float) tempCount) / 333.87 + 21.0; // Gyro chip temperature in degrees Centigrade
    // Print temperature in degrees Centigrade      
@@ -729,7 +788,6 @@ void loop()
 
     float altitude = 145366.45*(1. - pow((Pressure/1013.25), 0.190284));
    
-    if(SerialDebug) {
     debug("Digital temperature value = ");
     debug( (float)Temperature, 2);
     debugln(" C"); // temperature in degrees Celsius
@@ -743,7 +801,6 @@ void loop()
     debugln(" mbar");// pressure in millibar
     debug("Altitude = ");
     debug(altitude, 2); debugln(" feet");
-    }
  #endif // #ifdef COMPILE_MS5637
 
 
@@ -781,7 +838,7 @@ void loop()
     lin_ax = ax + a31;
     lin_ay = ay + a32;
     lin_az = az - a33;
-    if(SerialDebug) {
+
     debug("Yaw, Pitch, Roll: ");
     debug_2arg(yaw, 2);
     debug(", ");
@@ -807,31 +864,47 @@ void loop()
     debug("rate = ");
     debug_2arg((float)sumCount / sum, 2);
     debugln(" Hz");
-    }
    
     display.clearDisplay();    
  
-    display.setCursor(0, 0); display.print(" x   y   z ");
+    display.setCursor(0, 0);
+    display.print(" x   y   z ");
 
-    display.setCursor(0,  8); display.print((int)(1000*ax)); 
-    display.setCursor(24, 8); display.print((int)(1000*ay)); 
-    display.setCursor(48, 8); display.print((int)(1000*az)); 
-    display.setCursor(72, 8); display.print("mg");
+    display.setCursor(0,  8);
+    display.print((int)(1000 * ax)); 
+    display.setCursor(24, 8);
+    display.print((int)(1000 * ay)); 
+    display.setCursor(48, 8);
+    display.print((int)(1000 * az)); 
+    display.setCursor(72, 8);
+    display.print("mg");
     
-    display.setCursor(0,  16); display.print((int)(gx)); 
-    display.setCursor(24, 16); display.print((int)(gy)); 
-    display.setCursor(48, 16); display.print((int)(gz)); 
-    display.setCursor(66, 16); display.print("o/s");    
+    display.setCursor(0,  16);
+    display.print((int)(gx)); 
+    display.setCursor(24, 16);
+    display.print((int)(gy)); 
+    display.setCursor(48, 16);
+    display.print((int)(gz)); 
+    display.setCursor(66, 16);
+    display.print("o/s");    
 
-    display.setCursor(0,  24); display.print((int)(mx)); 
-    display.setCursor(24, 24); display.print((int)(my)); 
-    display.setCursor(48, 24); display.print((int)(mz)); 
-    display.setCursor(72, 24); display.print("mG");    
+    display.setCursor(0,  24);
+    display.print((int)(mx)); 
+    display.setCursor(24, 24);
+    display.print((int)(my)); 
+    display.setCursor(48, 24);
+    display.print((int)(mz)); 
+    display.setCursor(72, 24);
+    display.print("mG");    
  
-    display.setCursor(0,  32); display.print((int)(yaw)); 
-    display.setCursor(24, 32); display.print((int)(pitch)); 
-    display.setCursor(48, 32); display.print((int)(roll)); 
-    display.setCursor(66, 32); display.print("ypr");  
+    display.setCursor(0,  32);
+    display.print((int)(yaw)); 
+    display.setCursor(24, 32);
+    display.print((int)(pitch)); 
+    display.setCursor(48, 32);
+    display.print((int)(roll)); 
+    display.setCursor(66, 32);
+    display.print("ypr");  
   
     // With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and 
     // >200 Hz using the Mahony scheme even though the display refreshes at only 2 Hz.
@@ -851,14 +924,12 @@ void loop()
 #endif //#ifdef COMPILE_MS5637
 
     display.display();
-
     digitalWrite(myLed, !digitalRead(myLed));
     count = millis(); 
     sumCount = 0;
     sum = 0;    
-    }
-
-}
+    } // if delt_t > 500
+} // end loop
 
 //===================================================================================================================
 //====== Set of useful function to access acceleration. gyroscope, magnetometer, and temperature data
