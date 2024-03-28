@@ -37,10 +37,16 @@ git remote "kvaimu" renamed "origin"
 
 >>>>>>>>>>>>>>>>>>>>>>>> begin branch button_control
 
-12. insert code for button on interrupt:
-  12.1 one clic to continue on pause
+12. insert code for button on interrupt: FINISHED
+  12.1 one clic to continue on pause DONE
+>>>>>>>>>>>>>>>>>>>>>>>> end branch button_control TEST ADD commit -m "Issue 12: button interrupts to get out of pause display"
+branch button_control deleted
 
->>>>>>>>>>>>>>>>>>>>>>>> end branch button_control
+>>>>>>>>>>>>>>>>>>>>>>>> begin branch code_reorganize
+13. reorganise code:
+  13.1 create mpu9250_definitions.h for all definitions
+>>>>>>>>>>>>>>>>>>>>>>>> end branch code_reorganize
+
 
 13. Implement serial plot of YPR (see Kris Winer article)
 14. Set declination for home --> yaw   += 13.8f; // Declination 
