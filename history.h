@@ -19,8 +19,6 @@
 
 git commit -m "Documenting git repo and remote creation"
 >>>>>>>>>>>>>>>>>>>>>>>> branch main ADD COMMIT PUSHED
-
-todo
 8. Connexion I2C for MPU9250: DONE
  see comments for pinout on Teensy
 
@@ -42,14 +40,18 @@ git remote "kvaimu" renamed "origin"
 >>>>>>>>>>>>>>>>>>>>>>>> end branch button_control TEST ADD commit -m "Issue 12: button interrupts to get out of pause display"
 branch button_control deleted
 
->>>>>>>>>>>>>>>>>>>>>>>> begin branch code_reorganize
+>>>>>>>>>>>>>>>>>>>>>>>> begin branch code_reorganize TEST FINISHED
 13. reorganise code:
   13.1 create mpu9250_definitions.h for all definitions TEST ADD commit -m "mpu9250_definitions.h created and tested"
->>>>>>>>>>>>>>>>>>>>>>>> end branch code_reorganize
+  13.2 create mpu9250_code.h and add include directive TEST DONE
+  13.3 create i2c_general_functions.h and add include directive TEST DONE
+  13.4 create MS5637_code.h and add include directive (set NOT to compile) TEST DONE
+  13.5 ADD . DONE
+>>>>>>>>>>>>>>>>>>>>>>>> end branch code_reorganize TEST ADD commit -m "code reorganize finished"
 
 
-13. Implement serial plot of YPR (see Kris Winer article)
-14. Set declination for home --> yaw   += 13.8f; // Declination 
+xx. Implement serial plot of YPR (see Kris Winer article)
+xx. Set declination for home --> yaw   += 13.8f; // Declination 
 */
 
 #endif
