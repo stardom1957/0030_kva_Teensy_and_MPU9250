@@ -44,7 +44,7 @@ branch button_control deleted
 
 >>>>>>>>>>>>>>>>>>>>>>>> begin branch code_reorganize
 13. reorganise code:
-  13.1 create mpu9250_definitions.h for all definitions
+  13.1 create mpu9250_definitions.h for all definitions TEST ADD commit -m "mpu9250_definitions.h created and tested"
 >>>>>>>>>>>>>>>>>>>>>>>> end branch code_reorganize
 
 
